@@ -37,10 +37,15 @@ def create_single_game_df(og_df):
     return new_df
 
 
-def create_team_vector(single_game_df):
-    """Function for creating a two-hot vector with bits representing the presence of specific teams in the game"""
+def create_team_vector(single_game_df, split_seasons=False):
+    """Function for creating a two-hot vector with bits representing the presence of specific teams in the game
+        If split_seasons == True, treat team identifiers as unique per season"""
     # Converting teams to integer encoding
     team_encoder = LabelEncoder()
+    if split_seasons:
+        # Add a suffix that is the last two characters of the Season (aka ATL during 2016-2017 becomes ATL17)
+        single_game_df["Home_Team"] = single_game_df.apply(lambda row: row["Home_Team"] + row["Season"][-2:], axis=1)
+        single_game_df["Away_Team"] = single_game_df.apply(lambda row: row["Away_Team"] + row["Season"][-2:], axis=1)
     team_encoder.fit(np.ravel([single_game_df["Home_Team"], single_game_df["Away_Team"]]))
     single_game_df["Home_Team_Code"] = team_encoder.transform(single_game_df["Home_Team"])
     single_game_df["Away_Team_Code"] = team_encoder.transform(single_game_df["Away_Team"])
@@ -61,9 +66,9 @@ train_df = pd.read_csv(training_filename)
 full_df = create_single_game_df(og_df=train_df)
 full_df = full_df.fillna(0)
 # Intermediate saving since create_single_game_df takes a few seconds to run
-# full_df.to_csv("training_set_games.csv", index=True)
-# full_df = pd.read_csv("training_set_games.csv", index_col=0)
-team_df = create_team_vector(full_df)
+# full_df.to_csv("training_set_games_intermediate.csv", index=True)
+# full_df = pd.read_csv("training_set_games_intermediate.csv", index_col=0)
+team_df = create_team_vector(full_df, split_seasons=True)
 
 
 # Adding day of week and indicator if that day is a weeknight (or not)
@@ -71,4 +76,4 @@ team_df["DayOfWeek"] = pd.to_datetime(team_df["Game_Date"]).dt.weekday_name
 team_df["Weeknight"] = team_df["DayOfWeek"].apply(lambda cell: 1 if cell in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] else 0)
 
 # Outputting the revised data frame in a 'per game' format
-team_df.to_csv("training_set_games.csv", index=True, index_label="Game_ID")
+team_df.to_csv("training_set_games_split.csv", index=True, index_label="Game_ID")
