@@ -9,16 +9,17 @@ This appears to be a solid baseline model for TotalViewership
 
 CONCLUSION (after splitting on season): This model achieves an average cross-validation R^2 of 0.630 across 10 folds
     This model achieves an average cross-validation MAPE of 0.356 (NBA criteria for grading)
-This appears to improve slightly upon the previous model for TotalViewership"""
+This appears to improve slightly upon the previous model for TotalViewership
+
+CONCLUSION (after splitting on season and incorporating month of season): This model achieves an average cross-validation R^2 of 0.716 across 10 folds
+    This model achieves an average cross-validation MAPE of 0.308 (NBA criteria for grading)
+The early months (more audience) and late months (less audience) appear to be significant predictors that improve performance"""
 import pandas as pd
 import numpy as np
 import statsmodels.api as smi
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import KFold
 from sklearn.preprocessing import LabelEncoder
-
-# If set to true, predict each country individually, otherwise predict the total viewership
-MULTIVARIATE_PREDICTIONS = True
 
 # Read in file created from 'single_game_reformatting.py' script
 input_filename = "training_set_games_split.csv"
@@ -29,8 +30,10 @@ df["SeasonCode"] = label_encoder.fit_transform(df["Season"])
 
 # Get the columns to be used as inputs (Team indicator columns)
 #   Omitting LAC to avoid multicollinearity issues (otherwise the T- cols sum to 2)
+#   Omitting February (M-2) to avoid multicollinearity issues
 team_cols = [e for e in df.columns if "T-" in e and e != "T-LAC17"]
-input_cols = team_cols + ["Weeknight"]
+month_cols = [e for e in df.columns if "M-" in e and e != "M-2"]
+input_cols = team_cols + month_cols + ["Weeknight"]
 
 # Get data in supervised learning format f:X -> y
 X = df.loc[:, input_cols]
@@ -88,3 +91,5 @@ Xc = smi.add_constant(X)
 ols = smi.OLS(endog=y, exog=Xc)
 results = ols.fit()
 print(results.summary())
+
+results.save("lm_7-6-2018.pkl")

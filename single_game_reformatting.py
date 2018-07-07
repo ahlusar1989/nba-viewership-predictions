@@ -37,9 +37,10 @@ def create_single_game_df(og_df):
     return new_df
 
 
-def create_team_vector(single_game_df, split_seasons=False):
+def create_team_vector(arg_df, split_seasons=False):
     """Function for creating a two-hot vector with bits representing the presence of specific teams in the game
         If split_seasons == True, treat team identifiers as unique per season"""
+    single_game_df = arg_df.copy()
     # Converting teams to integer encoding
     team_encoder = LabelEncoder()
     if split_seasons:
@@ -59,21 +60,41 @@ def create_team_vector(single_game_df, split_seasons=False):
     merged_df = pd.concat([single_game_df, comb_df], axis=1)
     return merged_df
 
-# Original training set given by NBA
-training_filename = "training_set.csv"
-train_df = pd.read_csv(training_filename)
 
-full_df = create_single_game_df(og_df=train_df)
-full_df = full_df.fillna(0)
-# Intermediate saving since create_single_game_df takes a few seconds to run
-# full_df.to_csv("training_set_games_intermediate.csv", index=True)
-# full_df = pd.read_csv("training_set_games_intermediate.csv", index_col=0)
-team_df = create_team_vector(full_df, split_seasons=True)
+def create_month_vector(single_game_df):
+    """Function for adding an indicator for which month of the NBA season the game is played in
+    Doing this because the NFL investigation found that Fall games had large crowds"""
+    label_encoder = LabelEncoder()
+    single_game_df["Month"] = single_game_df["Game_Date"].apply(lambda cell: cell.split("/")[0])
+    single_game_df["MonthCode"] = label_encoder.fit_transform(single_game_df["Month"])
+
+    vector_encoder = OneHotEncoder(sparse=False)
+    month_vector = vector_encoder.fit_transform(single_game_df["MonthCode"].values.reshape(-1, 1))
+    as_df = pd.DataFrame(data=month_vector, index=single_game_df.index, columns=["M-%s" % e for e in label_encoder.classes_])
+
+    merged_df = pd.concat([single_game_df, as_df], axis=1)
+    return merged_df
+
+if __name__ == "__main__":
+    # Original training set given by NBA
+    training_filename = "training_set.csv"
+    train_df = pd.read_csv(training_filename)
+
+    full_df = create_single_game_df(og_df=train_df)
+    full_df = full_df.fillna(0)
+    # Intermediate saving since create_single_game_df takes a few seconds to run
+    # full_df.to_csv("training_set_games_intermediate.csv", index=True)
+    # full_df = pd.read_csv("training_set_games_intermediate.csv", index_col=0)
+    team_df = create_team_vector(full_df, split_seasons=True)
+    team_df = create_month_vector(team_df)
 
 
-# Adding day of week and indicator if that day is a weeknight (or not)
-team_df["DayOfWeek"] = pd.to_datetime(team_df["Game_Date"]).dt.weekday_name
-team_df["Weeknight"] = team_df["DayOfWeek"].apply(lambda cell: 1 if cell in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] else 0)
+    # Adding day of week and indicator if that day is a weeknight (or not)
+    team_df["DayOfWeek"] = pd.to_datetime(team_df["Game_Date"]).dt.weekday_name
+    team_df["Weeknight"] = team_df["DayOfWeek"].apply(lambda cell: 1 if cell in ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday"] else 0)
 
-# Outputting the revised data frame in a 'per game' format
-team_df.to_csv("training_set_games_split.csv", index=True, index_label="Game_ID")
+    # Outputting the revised data frame in a 'per game' format
+    team_df.to_csv("training_set_games_split.csv", index=True, index_label="Game_ID")
+
+
+
